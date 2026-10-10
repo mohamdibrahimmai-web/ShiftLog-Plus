@@ -10,6 +10,9 @@
     "migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "4.149.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

@@ -5,7 +5,7 @@ The original ShiftLog repository is outside this change.
 
 ## Deploy
 
-1. Install dependencies with npm install and commit the generated package-lock.json.
+1. Install dependencies with pnpm install --frozen-lockfile (Node 22.13+).
 2. Run npm test.
 3. Run npm run migrate:remote after confirming the account and test database.
    Migration adds branch_state and login_attempts. Existing staff, breaks and
