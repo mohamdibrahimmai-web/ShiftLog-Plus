@@ -1,13 +1,17 @@
 // Branch snapshots use compare-and-swap. Conflicts remain local until reviewed.
 const BRANCHES=['Motor City','Al Rigga','DIFC','Festival','Um Al Sheif','Al Qana'];
 const cacheKey=b=>'shiftlog.plus.sync.v1:'+b;
-let syncSession='',syncRevision=0,syncDirty=false,syncBusy=false,syncConflict=false,syncGeneration=0,syncCounter=0;
+let syncSession='',syncRevision=0,syncDirty=false,syncBusy=false,syncConflict=false,syncGeneration=0,syncCounter=0,loginBusy=false;
 function syncStatus(message){document.getElementById('syncStatus').textContent=message;}
 function persistSync(){if(!state.branch)return;localStorage.setItem(cacheKey(state.branch),JSON.stringify({data:state,revision:syncRevision,dirty:syncDirty,conflict:syncConflict}));}
 function readCache(branch){try{return JSON.parse(localStorage.getItem(cacheKey(branch))||'null')}catch{return null}}
 async function api(path,method='GET',data){
-  const response=await fetch('/api/'+path,{method,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-ShiftLog':'1'},...(data?{body:JSON.stringify(data)}:{})});
-  const result=await response.json();if(!response.ok){const e=Error(result.error||'Request failed');e.status=response.status;throw e;}return result;
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const response=await fetch('/api/'+path,{method,signal:controller.signal,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-ShiftLog':'1'},...(data?{body:JSON.stringify(data)}:{})});
+    const result=await response.json();if(!response.ok){const e=Error(result.error||'Request failed');e.status=response.status;throw e;}return result;
+  }catch(e){if(e.name==='AbortError')throw Error('Connection timed out. Please try again.');throw e;}
+  finally{clearTimeout(timer);}
 }
 function lockEditing(){
   // Keep navigation, backup and login available; data editing requires a branch session.
@@ -51,11 +55,16 @@ async function resumeSession(){
   catch{if(generation===syncGeneration)syncStatus(state.branch?'Sign in to '+state.branch:'Select a branch');}
 }
 async function signIn(){
+  if(loginBusy)return;
   if(!state.branch){toast('Select a branch first');return;}
-  const field=document.getElementById('branchPassword'),password=field.value;field.value='';
+  const field=document.getElementById('branchPassword'),password=field.value;
+  if(!password){syncStatus('Enter the password for '+state.branch);field.focus();return;}
   const branch=state.branch,generation=syncGeneration;
-  try{await api('login','POST',{branch,password});if(generation!==syncGeneration)return;syncSession=branch;renderAll();await synchronize();}
-  catch(e){syncStatus(e.message);}
+  const buttons=document.querySelectorAll('[onclick="signIn()"]');loginBusy=true;
+  buttons.forEach(b=>{b.disabled=true;b.textContent='Signing in…';});syncStatus('Signing in to '+branch+'…');
+  try{await api('login','POST',{branch,password});if(generation!==syncGeneration)return;field.value='';syncSession=branch;renderAll();syncStatus('Signed in · '+branch);toast('Signed in to '+branch);await synchronize();}
+  catch(e){if(generation===syncGeneration){syncStatus('Sign in failed · '+e.message);toast(e.message);}}
+  finally{loginBusy=false;buttons.forEach(b=>{b.disabled=false;b.textContent='Sign in';});}
 }
 async function signOut(){
   try{await api('logout','POST');syncGeneration++;syncSession='';renderAll();syncStatus('Signed out · local backup retained');}
@@ -81,7 +90,7 @@ async function synchronize(){
   }catch(e){
     if(generation!==syncGeneration)return;
     if(e.status===409){syncConflict=true;persistSync();renderAll();document.getElementById('conflictControls').hidden=false;syncStatus('Conflict: another device saved changes. Your local copy is retained.');}
-    else if(e.status===401||e.status===403){syncSession='';renderAll();syncStatus('Sign in to this branch again');}
+    else if(e.status===401||e.status===403){syncSession='';renderAll();syncStatus('Sign in to this branch again · '+e.message);}
     else syncStatus('Not synced · '+e.message+' · local changes retained');
   }finally{if(generation===syncGeneration)syncBusy=false;}
 }
