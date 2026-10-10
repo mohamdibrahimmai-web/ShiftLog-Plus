@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "shiftlog-plus-test",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-10",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shiftlog-plus-test-db",
+      "database_id": "c255cf7e-9192-4080-b6ed-a0eaa8c276ae",
+      "migrations_dir": "."
+    }
+  ]
+}
