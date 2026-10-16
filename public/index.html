@@ -153,6 +153,39 @@ function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 const toastEl=document.getElementById('toast');function tick(){clock.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});updateTimers()}setInterval(tick,1000);tick();renderAll();
 </script>
 <script src="/sync.js"></script>
+<script>
+(() => {
+  for (const action of ['toggleUnavailable', 'toggleBreak']) {
+    const original = window[action];
+    if (typeof original !== 'function') continue;
+
+    window[action] = function(name, ...args) {
+      const before = JSON.stringify([
+        state.unavailable.includes(name),
+        !!state.openBreaks[name]
+      ]);
+
+      const result = original.call(this, name, ...args);
+
+      const after = JSON.stringify([
+        state.unavailable.includes(name),
+        !!state.openBreaks[name]
+      ]);
+
+      if (before !== after) {
+        const input = document.getElementById('search');
+        if (input && input.value) {
+          input.value = '';
+          renderTeam();
+        }
+      }
+
+      return result;
+    };
+  }
+})();
+</script>
+
 </body>
 </html>
 
