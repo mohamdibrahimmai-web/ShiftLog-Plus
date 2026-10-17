@@ -153,6 +153,53 @@ function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 const toastEl=document.getElementById('toast');function tick(){clock.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});updateTimers()}setInterval(tick,1000);tick();renderAll();
 </script>
 <script src="/sync.js"></script>
+<script>
+(() => {
+  let pendingAction = null;
+
+  document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const button = target?.closest('#teamList .btn.break, #teamList .btn.status');
+    if (!button || button.disabled) return;
+    const input = document.getElementById('search');
+    if (!input || !input.value) return;
+    pendingAction = { input, value: input.value, at: Date.now() };
+  }, true);
+
+  const originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    let isStateWrite = false;
+    try {
+      const url = typeof input === 'string' ? input : String(input?.url || input);
+      const method = String(init?.method || input?.method || 'GET').toUpperCase();
+      isStateWrite = method === 'PUT' && new URL(url, location.href).pathname === '/api/state';
+    } catch {}
+
+    const action = isStateWrite ? pendingAction : null;
+    if (action && Date.now() - action.at > 15000) {
+      if (pendingAction === action) pendingAction = null;
+      return originalFetch.apply(this, arguments);
+    }
+
+    const result = originalFetch.apply(this, arguments);
+    if (!action || !result || typeof result.then !== 'function') return result;
+    return result.then(response => {
+      if (pendingAction !== action) return response;
+      pendingAction = null;
+      if (!response?.ok) return response;
+      setTimeout(() => {
+        if (!action.input.isConnected || action.input.value !== action.value) return;
+        action.input.value = '';
+        action.input.dispatchEvent(new Event('input', { bubbles: true }));
+      }, 150);
+      return response;
+    }, error => {
+      if (pendingAction === action) pendingAction = null;
+      throw error;
+    });
+  };
+})();
+</script>
+
 </body>
 </html>
-
