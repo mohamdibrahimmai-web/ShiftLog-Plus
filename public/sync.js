@@ -34,10 +34,24 @@ for(const name of ['toggleUnavailable','toggleBreak','openManager','saveManagerA
 const originalShowTab=showTab;
 showTab=function(tab){originalShowTab(tab);lockEditing();};
 save=function(){
-  if(!state.branch||syncSession!==state.branch||syncConflict){toast('Sign in to this branch before changing data');return;}
- const searchField=document.getElementById('search');
-if(searchField){searchField.value='';searchField.blur();}syncCounter++;persistSync();renderAll();
-  syncStatus('Saved on this device · waiting for sync');void synchronize();
+  if(!state.branch||syncSession!==state.branch||syncConflict){
+    toast('Sign in to this branch before changing data');
+    return;
+  }
+
+  const searchField=document.getElementById('search');
+  if(searchField){
+    searchField.value='';
+    searchField.blur();
+  }
+
+  state.updatedAt=new Date().toISOString();
+  syncDirty=true;
+  syncCounter++;
+  persistSync();
+  renderAll();
+  syncStatus('Saved on this device · waiting for sync');
+  void synchronize();
 };
 reloadState=function(){void synchronize();};
 setBranch=function(branch){
